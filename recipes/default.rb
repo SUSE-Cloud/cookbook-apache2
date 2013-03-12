@@ -23,13 +23,17 @@ end
 
 service "apache2" do
   case node['platform_family']
-  when "rhel", "fedora", "suse"
+  when "rhel", "fedora"
     service_name "httpd"
     # If restarted/reloaded too quickly httpd has a habit of failing.
     # This may happen with multiple recipes notifying apache to restart - like
     # during the initial bootstrap.
     restart_command "/sbin/service httpd restart && sleep 1"
     reload_command "/sbin/service httpd reload && sleep 1"
+  when "suse"
+    service_name "apache2"
+    restart_command "/sbin/service apache2 restart && sleep 1"
+    reload_command "/sbin/service apache2 reload && sleep 1"
   when "debian"
     service_name "apache2"
     restart_command "/usr/sbin/invoke-rc.d apache2 restart && sleep 1"
@@ -43,7 +47,7 @@ service "apache2" do
   action :enable
 end
 
-if platform_family?("rhel", "fedora", "arch", "suse", "freebsd")
+if platform_family?("rhel", "fedora", "arch", "freebsd")
   directory node['apache']['log_dir'] do
     mode 00755
   end
@@ -132,18 +136,21 @@ directory "#{node['apache']['dir']}/ssl" do
   mode 00755
   owner "root"
   group node['apache']['root_group']
+  not_if { platform_family? ("suse") }
 end
 
 directory "#{node['apache']['dir']}/conf.d" do
   mode 00755
   owner "root"
   group node['apache']['root_group']
+  not_if { platform_family? ("suse") }
 end
 
 directory node['apache']['cache_dir'] do
   mode 00755
   owner "root"
   group node['apache']['root_group']
+  not_if { platform_family? ("suse") }
 end
 
 # Set the preferred execution binary - prefork or worker
@@ -170,6 +177,7 @@ template "apache2.conf" do
   group node['apache']['root_group']
   mode 00644
   notifies :restart, "service[apache2]"
+  not_if { platform_family?("suse") }
 end
 
 template "apache2-conf-security" do
@@ -180,6 +188,7 @@ template "apache2-conf-security" do
   mode 00644
   backup false
   notifies :restart, "service[apache2]"
+  not_if { platform_family?("suse") }
 end
 
 template "apache2-conf-charset" do
@@ -190,9 +199,11 @@ template "apache2-conf-charset" do
   mode 00644
   backup false
   notifies :restart, "service[apache2]"
+  not_if { platform_family?("suse") }
 end
 
 template "#{node['apache']['dir']}/ports.conf" do
+  path "#{node[:apache][:dir]}/listen.conf" if node.platform == "suse"
   source "ports.conf.erb"
   owner "root"
   group node['apache']['root_group']
@@ -207,6 +218,7 @@ template "#{node['apache']['dir']}/sites-available/default" do
   group node['apache']['root_group']
   mode 00644
   notifies :restart, "service[apache2]"
+  not_if { platform_family?("suse") }
 end
 
 node['apache']['default_modules'].each do |mod|
@@ -216,6 +228,7 @@ end
 
 apache_site "default" do
   enable !!node['apache']['default_site_enabled']
+  not_if { platform_family?("suse") }
 end
 
 service "apache2" do
